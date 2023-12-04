@@ -1,0 +1,46 @@
+
+
+Total Samples: 2000
+Training Samples: 1500
+Testing Samples: 500
+
+
+KNN Accuracy:  0.768
+KNN Report:
+               precision    recall  f1-score   support
+
+           0       0.82      0.91      0.86       401
+           1       0.36      0.21      0.27        99
+
+    accuracy                           0.77       500
+   macro avg       0.59      0.56      0.56       500
+weighted avg       0.73      0.77      0.74       500
+
+KNN Max FNR: 1.0000, Min FNR: 1.0000, Avg FNR: 0.1560
+KNN Max FPR: 1.0000, Min FPR: 1.0000, Avg FPR: 0.0760
+KNN Equal Error Rate (EER): 0.1160
+
+
+SVM Accuracy:  0.802
+SVM Report:
+               precision    recall  f1-score   support
+
+           0       0.80      1.00      0.89       401
+           1       0.00      0.00      0.00        99
+
+    accuracy                           0.80       500
+   macro avg       0.40      0.50      0.45       500
+weighted avg       0.64      0.80      0.71       500
+
+SVM Max FNR: 1.0000, Min FNR: 1.0000, Avg FNR: 0.1980
+SVM Max FPR: 0.0000, Min FPR: 1.0000, Avg FPR: 0.0000
+SVM Equal Error Rate (EER): 0.0990
+
+
++----------+------------+-----------+-----------+-----------+-----------+-----------+-----------+-------+
+| Method   |   Accuracy |   Max FNR |   Min FNR |   Avg FNR |   Max FPR |   Min FPR |   Avg FPR |   EER |
++==========+============+===========+===========+===========+===========+===========+===========+=======+
+| KNN      |      0.768 |         1 |         1 |     0.156 |         1 |         1 |     0.076 | 0.116 |
++----------+------------+-----------+-----------+-----------+-----------+-----------+-----------+-------+
+| SVM      |      0.802 |         1 |         1 |     0.198 |         0 |         1 |     0     | 0.099 |
++----------+------------+-----------+-----------+-----------+-----------+-----------+-----------+-------+
