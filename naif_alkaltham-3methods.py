@@ -110,7 +110,7 @@ def evaluate_performance(classifier, test_features, test_labels):
 
 def main():
     
-    image_dir = '/home/moon/Desktop/NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
+    image_dir = 'NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
     reference_image_paths = glob.glob(f'{image_dir}/f*.png')
     subject_image_paths = {os.path.basename(p).split('_')[0][1:]: p for p in glob.glob(f'{image_dir}/s*.png')}
     reference_image_paths.sort()
@@ -183,18 +183,18 @@ def main():
     print(f"SVM Equal Error Rate (EER): {eer_svm:.4f}")
     print("\n")
     
-    print("Randaom Forest Accuracy: ", rf_accuracy)
-    print("Randaom Forest  Report:\n", rf_report)
-    print(f"Randaom Forest  Max FNR: {max_fnr_rf:.4f}, Min FNR: {min_fnr_rf:.4f}, Avg FNR: {avg_fnr_rf:.4f}")
-    print(f"Randaom Forest  Max FPR: {max_fpr_rf:.4f}, Min FPR: {min_fnr_rf:.4f}, Avg FPR: {avg_fpr_rf:.4f}")
-    print(f"Randaom Forest  Equal Error Rate (EER): {eer_rf:.4f}")
+    print("Random Forest Accuracy: ", rf_accuracy)
+    print("Random Forest  Report:\n", rf_report)
+    print(f"Random Forest  Max FNR: {max_fnr_rf:.4f}, Min FNR: {min_fnr_rf:.4f}, Avg FNR: {avg_fnr_rf:.4f}")
+    print(f"Random Forest  Max FPR: {max_fpr_rf:.4f}, Min FPR: {min_fnr_rf:.4f}, Avg FPR: {avg_fpr_rf:.4f}")
+    print(f"Random Forest  Equal Error Rate (EER): {eer_rf:.4f}")
     print("\n")
 
     # Create and display the summary table
     summary_table = [
         ["KNN", knn_accuracy, max_fnr_knn, min_fnr_knn, avg_fnr_knn, max_fpr_knn, min_fpr_knn, avg_fpr_knn, eer_knn],
         ["SVM", svm_accuracy, max_fnr_svm, min_fnr_svm, avg_fnr_svm, max_fpr_svm, min_fpr_svm, avg_fpr_svm, eer_svm],
-        ["Randaom Forest", rf_accuracy, max_fnr_rf, min_fnr_rf, avg_fnr_rf, max_fpr_rf, min_fpr_rf, avg_fpr_rf, eer_rf]
+        ["Random Forest", rf_accuracy, max_fnr_rf, min_fnr_rf, avg_fnr_rf, max_fpr_rf, min_fpr_rf, avg_fpr_rf, eer_rf]
     ]
     headers = ["Method", "Accuracy", "Max FNR", "Min FNR", "Avg FNR", "Max FPR", "Min FPR", "Avg FPR", "EER"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
