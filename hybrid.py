@@ -120,7 +120,6 @@ def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_fea
                 eer = min(sub_avg_frr, sub_avg_far)  # Equal Error Rate
                 accuracy = accuracy_score(test_labels, predictions)
                 report = classification_report(test_labels, predictions, zero_division=0)
-                print(i)
 
         avg_frr += sub_avg_frr
         avg_far += sub_avg_far
