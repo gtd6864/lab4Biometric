@@ -2,10 +2,10 @@ import numpy as np
 import cv2
 import glob
 
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import os
@@ -54,7 +54,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def ml_technique_one(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=15)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=20)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -86,21 +86,25 @@ def evaluate_performance(classifier, test_features, test_labels):
     # base final prediction off of a threshold - test a variety of thresholds
     for i in range(1, 99):
         predictions = (classifier.predict_proba(test_features)[:, 1] >= (i/100)).astype(int)
-        # cm = confusion_matrix(test_labels, predictions)
     
         # Additional Metrics
-        sum_frr = 0  # Sum of False Rejection Rates
-        sum_far = 0  # Sum of False Acceptance Rates
+        sum_frr = 0  # Sum of False Rejects
+        sum_far = 0  # Sum of False Accepts
+        true_rejects = 0 # total number of true rejects in the tested data
+        true_accepts = 0 # total number of true accepts in the tested data
     
         for j in range(len(test_labels)):
+            if(test_labels[j] == 1): # Count all true accepts
+                true_accepts += 1
+            else: # Count all true rejects
+                true_rejects += 1
             if test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
                 sum_frr += 1
             if test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
                 sum_far += 1
 
-        num_samples = len(test_labels) # maybe change this calculation to make sure that the number is correct
-        sub_avg_frr = sum_frr / num_samples
-        sub_avg_far = sum_far / num_samples
+        sub_avg_frr = sum_frr / true_accepts
+        sub_avg_far = sum_far / true_rejects
         if sub_avg_frr > max_frr:
             max_frr = sub_avg_frr
         if sub_avg_frr < min_frr:
@@ -110,9 +114,9 @@ def evaluate_performance(classifier, test_features, test_labels):
         if sub_avg_far < min_far:
             min_far = sub_avg_far
 
-        if (sub_avg_frr - .01) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .01):
-            if min(sub_avg_frr, sub_avg_far) < eer:
-                eer = min(sub_avg_frr, sub_avg_far)  # Equal Error Rate
+        if (sub_avg_frr - .035) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .035):
+            if (sub_avg_frr + sub_avg_far)/2 < eer:
+                eer = (sub_avg_frr + sub_avg_far)/2 # Equal Error Rate
                 accuracy = accuracy_score(test_labels, predictions)
                 report = classification_report(test_labels, predictions, zero_division=0)
 

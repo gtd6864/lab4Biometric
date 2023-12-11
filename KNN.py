@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score, classification_report
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 import os
-
+import random
 
 # Improved Image cleanup
 def cleanup_img(path):
@@ -56,7 +56,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def knn_ml_technique(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=15)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=20)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -65,24 +65,34 @@ def evaluate_performance(classifier, test_features, test_labels):
     frr = 0
     far = 0
 
-    predictions = (classifier.predict_proba(test_features)[:, 1] >= (.34)).astype(int)
-    accuracy = accuracy_score(test_labels, predictions)
-    report = classification_report(test_labels, predictions, zero_division=0)
+    r = random.sample(range(500), 100)  # choose a random set of indices to test
+    random_test_features = []
+    random_test_labels = []
+    for i in r:
+        random_test_features.append(test_features[i])
+        random_test_labels.append(test_labels[i])
+    predictions = (classifier.predict_proba(random_test_features)[:, 1] >= .26).astype(int)
+    accuracy = accuracy_score(random_test_labels, predictions)
+    report = classification_report(random_test_labels, predictions, zero_division=0)
 
     # Additional Metrics
-    sum_frr = 0  # Sum of False Rejection Rates
-    sum_far = 0  # Sum of False Acceptance Rates
+    sum_frr = 0  # Sum of False Rejects
+    sum_far = 0  # Sum of False Accepts
+    true_rejects = 0  # total number of true rejects in the tested data
+    true_accepts = 0  # total number of true accepts in the tested data
 
-    for j in range(len(test_labels)):
-        if test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
+    for j in range(len(random_test_labels)):
+        if (random_test_labels[j] == 1):  # Count all true accepts
+            true_accepts += 1
+        else:  # Count all true rejects
+            true_rejects += 1
+        if random_test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
             sum_frr += 1
-        if test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
+        if random_test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
             sum_far += 1
 
-    num_samples = len(test_labels)  # maybe change this calculation to make sure that the number is correct
-    frr = sum_frr / num_samples
-    far = sum_far / num_samples
-
+    frr = sum_frr / true_accepts
+    far = sum_far / true_rejects
 
     return accuracy, report, frr, far
 
