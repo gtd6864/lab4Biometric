@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import glob
+
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -18,6 +19,7 @@ def cleanup_img(path):
     # Adjust adaptive thresholding parameters if necessary
     return cv2.adaptiveThreshold(equ, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
+
 # Enhanced Minutiae detection
 def find_minutiae(path, disp=False):
     img = cleanup_img(path)
@@ -29,7 +31,8 @@ def find_minutiae(path, disp=False):
 
     # Refine corner locations
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
-    corners = cv2.goodFeaturesToTrack(dst, maxCorners=150, qualityLevel=0.01, minDistance=10, blockSize=3, useHarrisDetector=True)
+    corners = cv2.goodFeaturesToTrack(dst, maxCorners=150, qualityLevel=0.01, minDistance=10, blockSize=3,
+                                      useHarrisDetector=True)
 
     # Draw corners for display
     if disp:
@@ -42,6 +45,7 @@ def find_minutiae(path, disp=False):
 
     return corners
 
+
 # Feature extraction with fixed size
 def extract_features(minutiae, fixed_size=500):
     features = np.array([m.ravel() for m in minutiae if m is not None]).flatten()
@@ -51,11 +55,13 @@ def extract_features(minutiae, fixed_size=500):
         features = np.pad(features, (0, fixed_size - len(features)), 'constant')
     return features
 
+
 # K-Nearest Neighbors Classifier
 def ml_technique_one(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=5)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
+
 
 # Support Vector Machine Classifier
 def ml_technique_two(train_features, train_labels):
@@ -63,53 +69,74 @@ def ml_technique_two(train_features, train_labels):
     classifier.fit(train_features, train_labels)
     return classifier
 
+
 # Random Forest Classifier
 def ml_technique_three(train_features, train_labels):
     classifier = RandomForestClassifier(n_estimators=100, max_depth=200, min_samples_split=10, random_state=42)
     classifier.fit(train_features, train_labels)
     return classifier
-    
+
+
 # Performance evaluation with additional metrics
-def evaluate_performance(classifier, test_features, test_labels):
-    predictions = classifier.predict(test_features)
-    accuracy = accuracy_score(test_labels, predictions)
-    report = classification_report(test_labels, predictions, zero_division=0)
-    cm = confusion_matrix(test_labels, predictions)
-    
-    # Additional Metrics
-    max_fnr = 0  # Placeholder for maximum False Negative Rate
-    min_fnr = 1  # Placeholder for minimum False Negative Rate
-    sum_fnr = 0  # Sum of False Negative Rates
-    max_fpr = 0  # Placeholder for maximum False Positive Rate
-    min_fpr = 1  # Placeholder for minimum False Positive Rate
-    sum_fpr = 0  # Sum of False Positive Rates
-    
-    for i in range(len(test_labels)):
-        if test_labels[i] == 1 and predictions[i] == 0:  # False Negative
-            fnr = 1
-            sum_fnr += fnr
-            if fnr > max_fnr:
-                max_fnr = fnr
-            if fnr < min_fnr:
-                min_fnr = fnr
-        if test_labels[i] == 0 and predictions[i] == 1:  # False Positive
-            fpr = 1
-            sum_fpr += fpr
-            if fpr > max_fpr:
-                max_fpr = fpr
-            if fpr < min_fpr:
-                min_fpr = fpr
-    
-    num_samples = len(test_labels)
-    avg_fnr = sum_fnr / num_samples
-    avg_fpr = sum_fpr / num_samples
-    
-    eer = (avg_fnr + avg_fpr) / 2  # Equal Error Rate
-    
-    return accuracy, report, max_fnr, min_fnr, avg_fnr, max_fpr, min_fpr, avg_fpr, eer
+def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_features, test_labels):
+    max_frr = 0  # Placeholder for maximum False Rejection Rate
+    min_frr = 1  # Placeholder for minimum False Rejection Rate
+    max_far = 0  # Placeholder for maximum False Acceptance Rate
+    min_far = 1  # Placeholder for minimum False Acceptance Rate
+    avg_frr = 0
+    avg_far = 0
+    eer = 1
+
+
+    # base final prediction off of a threshold - test a variety of thresholds
+    for i in range(1, 99):
+        predictions = np.add(knn_classifier.predict_proba(test_features)[:, 1], svm_classifier.predict_proba(test_features)[:, 1])
+        predictions = np.add(predictions, rf_classifier.predict_proba(test_features)[:, 1])
+        predictions = ((predictions[:]/3) >= i/100).astype(int)
+
+        # Additional Metrics
+        sum_frr = 0  # Sum of False Rejects
+        sum_far = 0  # Sum of False Accepts
+        true_rejects = 0  # total number of true rejects in the tested data
+        true_accepts = 0  # total number of true accepts in the tested data
+
+        for j in range(len(test_labels)):
+            if (test_labels[j] == 1):  # Count all true accepts
+                true_accepts += 1
+            else:  # Count all true rejects
+                true_rejects += 1
+            if test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
+                sum_frr += 1
+            if test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
+                sum_far += 1
+
+        sub_avg_frr = sum_frr / true_accepts
+        sub_avg_far = sum_far / true_rejects
+        if sub_avg_frr > max_frr:
+            max_frr = sub_avg_frr
+        if sub_avg_frr < min_frr:
+            min_frr = sub_avg_frr
+        if sub_avg_far > max_far:
+            max_far = sub_avg_far
+        if sub_avg_far < min_far:
+            min_far = sub_avg_far
+
+        if (sub_avg_frr - .05) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .05):
+            if (sub_avg_frr + sub_avg_far) / 2 < eer:
+                eer = (sub_avg_frr + sub_avg_far) / 2  # Equal Error Rate
+                accuracy = accuracy_score(test_labels, predictions)
+                report = classification_report(test_labels, predictions, zero_division=0)
+
+        avg_frr += sub_avg_frr
+        avg_far += sub_avg_far
+
+    avg_frr = avg_frr / 99
+    avg_far = avg_far / 99
+
+    return accuracy, report, max_frr, min_frr, avg_frr, max_far, min_far, avg_far, eer
+
 
 def main():
-    
     image_dir = 'NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
     reference_image_paths = glob.glob(f'{image_dir}/f*.png')
     subject_image_paths = {os.path.basename(p).split('_')[0][1:]: p for p in glob.glob(f'{image_dir}/s*.png')}
@@ -139,16 +166,17 @@ def main():
             labels.append(label)
 
             # Debugging: Print extracted features, label, and image names
-            #print("Extracted Features:", combined_features)
-            #print("Label:", label)
-            #print("Image image pairs: ", os.path.basename(ref_path), os.path.basename(subj_path))
-        
+            # print("Extracted Features:", combined_features)
+            # print("Label:", label)
+            # print("Image image pairs: ", os.path.basename(ref_path), os.path.basename(subj_path))
 
     paired_features = np.array(paired_features)
     labels = np.array(labels, dtype=int)
 
-    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25, random_state=42)
-    
+    # separate the data into first 1500 for training, last 500 for testing
+    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
+                                                                                shuffle=False)
+
     # Print information about the dataset
     print("\n")
     total_samples = len(train_features) + len(test_features)
@@ -163,41 +191,27 @@ def main():
     svm_classifier = ml_technique_two(train_features, train_labels)
     rf_classifier = ml_technique_three(train_features, train_labels)
 
-    knn_accuracy, knn_report, max_fnr_knn, min_fnr_knn, avg_fnr_knn, max_fpr_knn, min_fpr_knn, avg_fpr_knn, eer_knn = evaluate_performance(knn_classifier, test_features, test_labels)
-    svm_accuracy, svm_report, max_fnr_svm, min_fnr_svm, avg_fnr_svm, max_fpr_svm, min_fpr_svm, avg_fpr_svm, eer_svm = evaluate_performance(svm_classifier, test_features, test_labels)
-    rf_accuracy, rf_report, max_fnr_rf, min_fnr_rf, avg_fnr_rf, max_fpr_rf, min_fpr_rf, avg_fpr_rf, eer_rf = evaluate_performance(rf_classifier, test_features, test_labels)
+    hybrid_accuracy, hybrid_report, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid = evaluate_performance(
+        knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
+
 
     # Print KNN and SVM results
     # Print results
-    print("KNN Accuracy: ", knn_accuracy)
-    print("KNN Report:\n", knn_report)
-    print(f"KNN Max FNR: {max_fnr_knn:.4f}, Min FNR: {min_fnr_knn:.4f}, Avg FNR: {avg_fnr_knn:.4f}")
-    print(f"KNN Max FPR: {max_fpr_knn:.4f}, Min FPR: {min_fpr_knn:.4f}, Avg FPR: {avg_fpr_knn:.4f}")
-    print(f"KNN Equal Error Rate (EER): {eer_knn:.4f}")
+    print("Hybrid Accuracy: ", hybrid_accuracy)
+    print("Hybrid Report:\n", hybrid_report)
+    print(f"Hybrid Max FRR: {max_frr_hybrid:.4f}, Min FRR: {min_frr_hybrid:.4f}, Avg FRR: {avg_frr_hybrid:.4f}")
+    print(f"Hybrid Max FAR: {max_far_hybrid:.4f}, Min FAR: {min_far_hybrid:.4f}, Avg FAR: {avg_far_hybrid:.4f}")
+    print(f"Hybrid Equal Error Rate (EER): {eer_hybrid:.4f}")
     print("\n")
 
-    print("SVM Accuracy: ", svm_accuracy)
-    print("SVM Report:\n", svm_report)
-    print(f"SVM Max FNR: {max_fnr_svm:.4f}, Min FNR: {min_fnr_svm:.4f}, Avg FNR: {avg_fnr_svm:.4f}")
-    print(f"SVM Max FPR: {max_fpr_svm:.4f}, Min FPR: {min_fnr_svm:.4f}, Avg FPR: {avg_fpr_svm:.4f}")
-    print(f"SVM Equal Error Rate (EER): {eer_svm:.4f}")
-    print("\n")
-    
-    print("Random Forest Accuracy: ", rf_accuracy)
-    print("Random Forest  Report:\n", rf_report)
-    print(f"Random Forest  Max FNR: {max_fnr_rf:.4f}, Min FNR: {min_fnr_rf:.4f}, Avg FNR: {avg_fnr_rf:.4f}")
-    print(f"Random Forest  Max FPR: {max_fpr_rf:.4f}, Min FPR: {min_fnr_rf:.4f}, Avg FPR: {avg_fpr_rf:.4f}")
-    print(f"Random Forest  Equal Error Rate (EER): {eer_rf:.4f}")
-    print("\n")
 
     # Create and display the summary table
     summary_table = [
-        ["KNN", knn_accuracy, max_fnr_knn, min_fnr_knn, avg_fnr_knn, max_fpr_knn, min_fpr_knn, avg_fpr_knn, eer_knn],
-        ["SVM", svm_accuracy, max_fnr_svm, min_fnr_svm, avg_fnr_svm, max_fpr_svm, min_fpr_svm, avg_fpr_svm, eer_svm],
-        ["Random Forest", rf_accuracy, max_fnr_rf, min_fnr_rf, avg_fnr_rf, max_fpr_rf, min_fpr_rf, avg_fpr_rf, eer_rf]
+        ["hybrid", hybrid_accuracy, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid]
     ]
-    headers = ["Method", "Accuracy", "Max FNR", "Min FNR", "Avg FNR", "Max FPR", "Min FPR", "Avg FPR", "EER"]
+    headers = ["Method", "Accuracy", "Max FRR", "Min FRR", "Avg FRR", "Max FAR", "Min FAR", "Avg FAR", "EER"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
+
 
 if __name__ == '__main__':
     main()
