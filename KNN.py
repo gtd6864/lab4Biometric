@@ -56,7 +56,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def knn_ml_technique(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=20)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -71,7 +71,7 @@ def evaluate_performance(classifier, test_features, test_labels):
     for i in r:
         random_test_features.append(test_features[i])
         random_test_labels.append(test_labels[i])
-    predictions = (classifier.predict_proba(random_test_features)[:, 1] >= .26).astype(int)
+    predictions = (classifier.predict_proba(random_test_features)[:, 1] >= .31).astype(int)
     accuracy = accuracy_score(random_test_labels, predictions)
     report = classification_report(random_test_labels, predictions, zero_division=0)
 
@@ -134,23 +134,13 @@ def main():
     paired_features = np.array(paired_features)
     labels = np.array(labels, dtype=int)
 
+    # separate the data into first 1500 for training, last 500 for testing
     train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
-                                                                                random_state=42)
-
-    # Print information about the dataset
-    print("\n")
-    total_samples = len(train_features) + len(test_features)
-    train_samples = len(train_features)
-    test_samples = len(test_features)
-    print(f"Total Samples: {total_samples}")
-    print(f"Training Samples: {train_samples}")
-    print(f"Testing Samples: {test_samples}")
-    print("\n")
-
+                                                                                shuffle=False)
     knn_classifier = knn_ml_technique(train_features, train_labels)
 
     knn_accuracy, knn_report, frr, far = evaluate_performance(
-        knn_classifier, test_features, test_labels)
+    knn_classifier, test_features, test_labels)
 
     # Print KNN and SVM results
     # Print results
@@ -167,7 +157,6 @@ def main():
     ]
     headers = ["Method", "Accuracy", "FRR", "FAR"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
-
 
 if __name__ == '__main__':
     main()

@@ -135,23 +135,14 @@ def main():
     paired_features = np.array(paired_features)
     labels = np.array(labels, dtype=int)
 
+    # separate the data into first 1500 for training, last 500 for testing
     train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
-                                                                                random_state=42)
-
-    # Print information about the dataset
-    print("\n")
-    total_samples = len(train_features) + len(test_features)
-    train_samples = len(train_features)
-    test_samples = len(test_features)
-    print(f"Total Samples: {total_samples}")
-    print(f"Training Samples: {train_samples}")
-    print(f"Testing Samples: {test_samples}")
-    print("\n")
+                                                                                shuffle=False)
 
     svm_classifier = svm_ml_technique(train_features, train_labels)
 
     svm_accuracy, svm_report, frr, far = evaluate_performance(
-        svm_classifier, test_features, test_labels)
+    svm_classifier, test_features, test_labels)
 
     print("SVM Accuracy: ", svm_accuracy)
     print("SVM Report:\n", svm_report)
@@ -165,7 +156,6 @@ def main():
     ]
     headers = ["Method", "Accuracy", "FRR", "FAR"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
-
 
 if __name__ == '__main__':
     main()

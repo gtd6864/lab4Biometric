@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 import os
 from sklearn.ensemble import RandomForestClassifier
-import random
 
 
 # Improved Image cleanup
@@ -80,43 +79,61 @@ def ml_technique_three(train_features, train_labels):
 
 # Performance evaluation with additional metrics
 def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_features, test_labels):
-    frr = 0
-    far = 0
+    max_frr = 0  # Placeholder for maximum False Rejection Rate
+    min_frr = 1  # Placeholder for minimum False Rejection Rate
+    max_far = 0  # Placeholder for maximum False Acceptance Rate
+    min_far = 1  # Placeholder for minimum False Acceptance Rate
+    avg_frr = 0
+    avg_far = 0
+    eer = 1
 
-    r = random.sample(range(500), 100)  # choose a random set of indices to test
-    random_test_features = []
-    random_test_labels = []
-    for i in r:
-        random_test_features.append(test_features[i])
-        random_test_labels.append(test_labels[i])
 
-    predictions = np.add(knn_classifier.predict_proba(random_test_features)[:, 1],
-                         svm_classifier.predict_proba(random_test_features)[:, 1])
-    predictions = np.add(predictions, rf_classifier.predict_proba(random_test_features)[:, 1])
-    predictions = ((predictions[:] / 3) >= .25).astype(int)
-    accuracy = accuracy_score(random_test_labels, predictions)
-    report = classification_report(random_test_labels, predictions, zero_division=0)
+    # base final prediction off of a threshold - test a variety of thresholds
+    for i in range(1, 99):
+        predictions = np.add(knn_classifier.predict_proba(test_features)[:, 1], svm_classifier.predict_proba(test_features)[:, 1])
+        predictions = np.add(predictions, rf_classifier.predict_proba(test_features)[:, 1])
+        predictions = ((predictions[:]/3) >= i/100).astype(int)
 
-    # Additional Metrics
-    sum_frr = 0  # Sum of False Rejects
-    sum_far = 0  # Sum of False Accepts
-    true_rejects = 0  # total number of true rejects in the tested data
-    true_accepts = 0  # total number of true accepts in the tested data
+        # Additional Metrics
+        sum_frr = 0  # Sum of False Rejects
+        sum_far = 0  # Sum of False Accepts
+        true_rejects = 0  # total number of true rejects in the tested data
+        true_accepts = 0  # total number of true accepts in the tested data
 
-    for j in range(len(random_test_labels)):
-        if (random_test_labels[j] == 1):  # Count all true accepts
-            true_accepts += 1
-        else:  # Count all true rejects
-            true_rejects += 1
-        if random_test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
-            sum_frr += 1
-        if random_test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
-            sum_far += 1
+        for j in range(len(test_labels)):
+            if (test_labels[j] == 1):  # Count all true accepts
+                true_accepts += 1
+            else:  # Count all true rejects
+                true_rejects += 1
+            if test_labels[j] == 1 and predictions[j] == 0:  # False Rejection
+                sum_frr += 1
+            if test_labels[j] == 0 and predictions[j] == 1:  # False Acceptance
+                sum_far += 1
 
-    frr = sum_frr / true_accepts
-    far = sum_far / true_rejects
+        sub_avg_frr = sum_frr / true_accepts
+        sub_avg_far = sum_far / true_rejects
+        if sub_avg_frr > max_frr:
+            max_frr = sub_avg_frr
+        if sub_avg_frr < min_frr:
+            min_frr = sub_avg_frr
+        if sub_avg_far > max_far:
+            max_far = sub_avg_far
+        if sub_avg_far < min_far:
+            min_far = sub_avg_far
 
-    return accuracy, report, frr, far
+        if (sub_avg_frr - .05) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .05):
+            if (sub_avg_frr + sub_avg_far) / 2 < eer:
+                eer = (sub_avg_frr + sub_avg_far) / 2  # Equal Error Rate
+                accuracy = accuracy_score(test_labels, predictions)
+                report = classification_report(test_labels, predictions, zero_division=0)
+
+        avg_frr += sub_avg_frr
+        avg_far += sub_avg_far
+
+    avg_frr = avg_frr / 99
+    avg_far = avg_far / 99
+
+    return accuracy, report, max_frr, min_frr, avg_frr, max_far, min_far, avg_far, eer
 
 
 def main():
@@ -160,30 +177,40 @@ def main():
     train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
                                                                                 shuffle=False)
 
+    # Print information about the dataset
+    print("\n")
+    total_samples = len(train_features) + len(test_features)
+    train_samples = len(train_features)
+    test_samples = len(test_features)
+    print(f"Total Samples: {total_samples}")
+    print(f"Training Samples: {train_samples}")
+    print(f"Testing Samples: {test_samples}")
+    print("\n")
+
     knn_classifier = ml_technique_one(train_features, train_labels)
     svm_classifier = ml_technique_two(train_features, train_labels)
     rf_classifier = ml_technique_three(train_features, train_labels)
 
-    hybrid_accuracy, hybrid_report, frr, far = evaluate_performance(
-    knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
+    hybrid_accuracy, hybrid_report, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid = evaluate_performance(
+        knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
 
 
     # Print KNN and SVM results
     # Print results
     print("Hybrid Accuracy: ", hybrid_accuracy)
     print("Hybrid Report:\n", hybrid_report)
-    print(f"Hybrid FRR: {frr:.4f}")
-    print(f"Hybrid FAR: {far:.4f}")
+    print(f"Hybrid Max FRR: {max_frr_hybrid:.4f}, Min FRR: {min_frr_hybrid:.4f}, Avg FRR: {avg_frr_hybrid:.4f}")
+    print(f"Hybrid Max FAR: {max_far_hybrid:.4f}, Min FAR: {min_far_hybrid:.4f}, Avg FAR: {avg_far_hybrid:.4f}")
+    print(f"Hybrid Equal Error Rate (EER): {eer_hybrid:.4f}")
     print("\n")
 
 
     # Create and display the summary table
     summary_table = [
-        ["hybrid", hybrid_accuracy, frr, far]
+        ["hybrid", hybrid_accuracy, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid]
     ]
-    headers = ["Method", "Accuracy", "FRR", "FAR"]
+    headers = ["Method", "Accuracy", "Max FRR", "Min FRR", "Avg FRR", "Max FAR", "Min FAR", "Avg FAR", "EER"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
-
 
 
 if __name__ == '__main__':

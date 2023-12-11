@@ -54,7 +54,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def ml_technique_one(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=20)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -114,7 +114,7 @@ def evaluate_performance(classifier, test_features, test_labels):
         if sub_avg_far < min_far:
             min_far = sub_avg_far
 
-        if (sub_avg_frr - .035) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .035):
+        if (sub_avg_frr - .03) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .03):
             if (sub_avg_frr + sub_avg_far)/2 < eer:
                 eer = (sub_avg_frr + sub_avg_far)/2 # Equal Error Rate
                 accuracy = accuracy_score(test_labels, predictions)
@@ -167,7 +167,8 @@ def main():
     paired_features = np.array(paired_features)
     labels = np.array(labels, dtype=int)
 
-    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25, random_state=42)
+    # separate the data into first 1500 for training, last 500 for testing
+    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25, shuffle=False)
     
     # Print information about the dataset
     print("\n")
