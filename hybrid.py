@@ -59,7 +59,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def ml_technique_one(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=100)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -90,10 +90,17 @@ def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_fea
         random_test_features.append(test_features[i])
         random_test_labels.append(test_labels[i])
 
-    predictions = np.add(knn_classifier.predict_proba(random_test_features)[:, 1],
-                         svm_classifier.predict_proba(random_test_features)[:, 1])
-    predictions = np.add(predictions, rf_classifier.predict_proba(random_test_features)[:, 1])
-    predictions = ((predictions[:] / 3) >= .25).astype(int)
+    # KNN is most accurate, gets weight of 4. SVM is least accurate, gets weight of 2.
+    knn_predictions = knn_classifier.predict_proba(random_test_features)[:, 1]
+    knn_predictions = [x * 4 for x in knn_predictions]
+    svm_predictions = svm_classifier.predict_proba(random_test_features)[:, 1]
+    svm_predictions = [x * 2 for x in svm_predictions]
+    # RF is similarly accurate to KNN, also gets weight of 4.
+    rf_predictions = rf_classifier.predict_proba(random_test_features)[:, 1]
+    rf_predictions = [x * 4 for x in rf_predictions]
+    predictions = np.add(knn_predictions, svm_predictions)
+    predictions = np.add(predictions, rf_predictions)
+    predictions = ((predictions[:] / 10) >= .27).astype(int)
     accuracy = accuracy_score(random_test_labels, predictions)
     report = classification_report(random_test_labels, predictions, zero_division=0)
 
@@ -127,9 +134,9 @@ def main():
 
     paired_features = []
     labels = []
-
-    # Load data and extract features for paired images
-    for ref_path in reference_image_paths:
+    # Load data and extract features for the 1500 training images, 1500 matches and 3000 non-matches
+    for i in range(len(reference_image_paths) - 500):
+        ref_path = reference_image_paths[i]
         file_id = os.path.basename(ref_path).split('_')[0][1:]
         subj_path = subject_image_paths.get(file_id)
         if subj_path:
@@ -141,24 +148,105 @@ def main():
             combined_features = np.concatenate((ref_features, subj_features))
 
             paired_features.append(combined_features)
+            # all feature pairs should be a match
+            labels.append(1)
+        # add 2 mismatch pairs for every fingerprint as well
+        if i == 0:
+            dif_path = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 502]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 503]
+        elif i == 1:
+            dif_path = reference_image_paths[0]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 502]
+        elif i == 2:
+            dif_path = reference_image_paths[1]
+            dif_path_2 = reference_image_paths[0]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 501]
+        else:
+            dif_path = reference_image_paths[i - 1]
+            dif_path_2 = reference_image_paths[i - 2]
+            dif_path_3 = reference_image_paths[i - 3]
+        file_id = os.path.basename(dif_path).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            label_path = ref_path.replace('.png', '.txt')
-            with open(label_path, 'r') as f:
-                label_text = f.read().strip()
-                label = 0 if "Gender: M" in label_text else 1
-            labels.append(label)
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_2).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            # Debugging: Print extracted features, label, and image names
-            # print("Extracted Features:", combined_features)
-            # print("Label:", label)
-            # print("Image image pairs: ", os.path.basename(ref_path), os.path.basename(subj_path))
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_3).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-    paired_features = np.array(paired_features)
-    labels = np.array(labels, dtype=int)
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
 
-    # separate the data into first 1500 for training, last 500 for testing
-    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
-                                                                                shuffle=False)
+    train_features = np.array(paired_features)
+    train_labels = np.array(labels, dtype=int)
+
+    # create our test features and labels
+    test_features = []
+    test_labels = []
+
+    # compare each of our 500 test values to either itself or another random test value
+    for i in range(500):
+        ref_path = reference_image_paths[i + 1500]
+        ref_minutiae = find_minutiae(ref_path, disp=False)
+        ref_features = extract_features(ref_minutiae)
+        k = random.randint(0, 1)
+        # just do a normal matching pair
+        if k == 0:
+            file_id = os.path.basename(ref_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # all feature pairs should be a match
+                test_labels.append(1)
+        # otherwise, pair it with a random other value from the test fingerprints
+        else:
+            j = random.randint(1500, 1999)
+            while j == i:
+                j = random.randint(1500, 1999)
+            dif_path = reference_image_paths[j]
+            file_id = os.path.basename(dif_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # a mismatch pair should be always be a 0
+                test_labels.append(0)
+
+    # Print information about the dataset
+    print("\n")
+    total_samples = len(train_features) + len(test_features)
+    train_samples = len(train_features)
+    test_samples = len(test_features)
+    print(f"Total Samples: {total_samples}")
+    print(f"Training Samples: {train_samples}")
+    print(f"Testing Samples: {test_samples}")
+    print("\n")
 
     knn_classifier = ml_technique_one(train_features, train_labels)
     svm_classifier = ml_technique_two(train_features, train_labels)
@@ -167,8 +255,6 @@ def main():
     hybrid_accuracy, hybrid_report, frr, far = evaluate_performance(
     knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
 
-
-    # Print KNN and SVM results
     # Print results
     print("Hybrid Accuracy: ", hybrid_accuracy)
     print("Hybrid Report:\n", hybrid_report)
@@ -183,7 +269,6 @@ def main():
     ]
     headers = ["Method", "Accuracy", "FRR", "FAR"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
-
 
 
 if __name__ == '__main__':
