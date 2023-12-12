@@ -2,7 +2,6 @@ import numpy as np
 import cv2
 import glob
 
-from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report
@@ -10,6 +9,7 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 import os
 from sklearn.ensemble import RandomForestClassifier
+import random
 
 
 # Improved Image cleanup
@@ -54,7 +54,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def ml_technique_one(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=100)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -114,7 +114,7 @@ def evaluate_performance(classifier, test_features, test_labels):
         if sub_avg_far < min_far:
             min_far = sub_avg_far
 
-        if (sub_avg_frr - .03) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .03):
+        if (sub_avg_frr - .06) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .06):
             if (sub_avg_frr + sub_avg_far)/2 < eer:
                 eer = (sub_avg_frr + sub_avg_far)/2 # Equal Error Rate
                 accuracy = accuracy_score(test_labels, predictions)
@@ -137,9 +137,9 @@ def main():
 
     paired_features = []
     labels = []
-
-    # Load data and extract features for paired images
-    for ref_path in reference_image_paths:
+    # Load data and extract features for the 1500 training images, 1500 matches and 3000 non-matches
+    for i in range(len(reference_image_paths) - 500):
+        ref_path = reference_image_paths[i]
         file_id = os.path.basename(ref_path).split('_')[0][1:]
         subj_path = subject_image_paths.get(file_id)
         if subj_path:
@@ -151,24 +151,98 @@ def main():
             combined_features = np.concatenate((ref_features, subj_features))
 
             paired_features.append(combined_features)
+            # all feature pairs should be a match
+            labels.append(1)
+        # add 2 mismatch pairs for every fingerprint as well
+        if i == 0:
+            dif_path = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 502]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 503]
+        elif i == 1:
+            dif_path = reference_image_paths[0]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 502]
+        elif i == 2:
+            dif_path = reference_image_paths[1]
+            dif_path_2 = reference_image_paths[0]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 501]
+        else:
+            dif_path = reference_image_paths[i - 1]
+            dif_path_2 = reference_image_paths[i - 2]
+            dif_path_3 = reference_image_paths[i - 3]
+        file_id = os.path.basename(dif_path).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            label_path = ref_path.replace('.png', '.txt')
-            with open(label_path, 'r') as f:
-                label_text = f.read().strip()
-                label = 0 if "Gender: M" in label_text else 1
-            labels.append(label)
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_2).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            # Debugging: Print extracted features, label, and image names
-            #print("Extracted Features:", combined_features)
-            #print("Label:", label)
-            #print("Image image pairs: ", os.path.basename(ref_path), os.path.basename(subj_path))
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_3).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
+
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+
         
 
-    paired_features = np.array(paired_features)
-    labels = np.array(labels, dtype=int)
+    train_features = np.array(paired_features)
+    train_labels = np.array(labels, dtype=int)
 
-    # separate the data into first 1500 for training, last 500 for testing
-    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25, shuffle=False)
+    # create our test features and labels
+    test_features = []
+    test_labels = []
+
+    # compare each of our 500 test values to either itself or another random test value
+    for i in range(500):
+        ref_path = reference_image_paths[i + 1500]
+        ref_minutiae = find_minutiae(ref_path, disp=False)
+        ref_features = extract_features(ref_minutiae)
+        k = random.randint(0, 1)
+        # just do a normal matching pair
+        if k == 0:
+            file_id = os.path.basename(ref_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # all feature pairs should be a match
+                test_labels.append(1)
+        # otherwise, pair it with a random other value from the test fingerprints
+        else:
+            j = random.randint(1500, 1999)
+            while j == i:
+                j = random.randint(1500, 1999)
+            dif_path = reference_image_paths[j]
+            file_id = os.path.basename(dif_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # a mismatch pair should be always be a 0
+                test_labels.append(0)
+
     
     # Print information about the dataset
     print("\n")
@@ -204,7 +278,6 @@ def main():
     print(f"SVM Equal Error Rate (EER): {eer_svm:.4f}")
     print("\n")
     
-    print("Random Forest Accuracy: ", rf_accuracy)
     print("Random Forest  Report:\n", rf_report)
     print(f"Random Forest  Max FRR: {max_frr_rf:.4f}, Min FRR: {min_frr_rf:.4f}, Avg FRR: {avg_frr_rf:.4f}")
     print(f"Random Forest  Max FAR: {max_far_rf:.4f}, Min FAR: {min_frr_rf:.4f}, Avg FAR: {avg_far_rf:.4f}")
