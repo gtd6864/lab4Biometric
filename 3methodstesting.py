@@ -114,7 +114,7 @@ def evaluate_performance(classifier, test_features, test_labels):
         if sub_avg_far < min_far:
             min_far = sub_avg_far
 
-        if (sub_avg_frr - .2) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .2):
+        if (sub_avg_frr - .06) <= sub_avg_far and sub_avg_far <= (sub_avg_frr + .06):
             if (sub_avg_frr + sub_avg_far)/2 < eer:
                 eer = (sub_avg_frr + sub_avg_far)/2 # Equal Error Rate
                 accuracy = accuracy_score(test_labels, predictions)
