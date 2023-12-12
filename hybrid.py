@@ -125,7 +125,9 @@ def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_fea
 
     return accuracy, report, frr, far
 
-def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False):
+
+def compare_fingerprints(knn_classifier, svm_classifier, rf_classifier, path_a, path_b, similarity_threshold=0.27,
+                         debug=False, ):
     # Detect minutiae points
     minutiae_a = find_minutiae(path_a, debug)
     minutiae_b = find_minutiae(path_b, debug)
@@ -133,13 +135,23 @@ def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False)
     # Extract features
     features_a = extract_features(minutiae_a)
     features_b = extract_features(minutiae_b)
-    
+
     combined_features = np.concatenate((features_a, features_b))
     # Calculate similarity
-    similarity = classifier.predict_proba(combined_features)[:, 1] >= .31
+    knn_predictions = knn_classifier.predict_proba(combined_features)[:, 1]
+    knn_predictions = [x * 4 for x in knn_predictions]
+    svm_predictions = svm_classifier.predict_proba(combined_features)[:, 1]
+    svm_predictions = [x * 2 for x in svm_predictions]
+    # RF is similarly accurate to KNN, also gets weight of 4.
+    rf_predictions = rf_classifier.predict_proba(combined_features)[:, 1]
+    rf_predictions = [x * 4 for x in rf_predictions]
+    predictions = np.add(knn_predictions, svm_predictions)
+    predictions = np.add(predictions, rf_predictions)
+    similarity = ((predictions[:] / 10) >= similarity_threshold).astype(int)
 
     # Determine if the fingerprints are similar or not
-    return True if similarity == 1 else False
+    return True if similarity[0] == 1 else False
+
 
 def main():
     image_dir = 'NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
@@ -268,7 +280,7 @@ def main():
     rf_classifier = ml_technique_three(train_features, train_labels)
 
     hybrid_accuracy, hybrid_report, frr, far = evaluate_performance(
-    knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
+        knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
 
     # Print results
     print("Hybrid Accuracy: ", hybrid_accuracy)
@@ -276,7 +288,6 @@ def main():
     print(f"Hybrid FRR: {frr:.4f}")
     print(f"Hybrid FAR: {far:.4f}")
     print("\n")
-
 
     # Create and display the summary table
     summary_table = [
@@ -288,4 +299,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

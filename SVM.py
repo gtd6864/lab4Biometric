@@ -54,6 +54,7 @@ def extract_features(minutiae, fixed_size=500):
         features = np.pad(features, (0, fixed_size - len(features)), 'constant')
     return features
 
+
 # Support Vector Machine Classifier
 def svm_ml_technique(train_features, train_labels):
     classifier = SVC(gamma='scale', kernel='rbf', probability=True)  # Experiment with different kernels
@@ -97,7 +98,8 @@ def evaluate_performance(classifier, test_features, test_labels):
 
     return accuracy, report, frr, far
 
-def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False):
+
+def compare_fingerprints(classifier, path_a, path_b, similarity_threshold=0.13, debug=False):
     # Detect minutiae points
     minutiae_a = find_minutiae(path_a, debug)
     minutiae_b = find_minutiae(path_b, debug)
@@ -105,14 +107,15 @@ def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False)
     # Extract features
     features_a = extract_features(minutiae_a)
     features_b = extract_features(minutiae_b)
-    
+
     combined_features = np.concatenate((features_a, features_b))
     # Calculate similarity
-    similarity = classifier.predict_proba(combined_features)[:, 1] >= .31
+    similarity = (classifier.predict_proba(combined_features)[:, 1] >= similarity_threshold).astype(int)
 
     # Determine if the fingerprints are similar or not
-    return True if similarity == 1 else False
-    
+    return True if similarity[0] == 1 else False
+
+
 def main():
     image_dir = 'NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
     reference_image_paths = glob.glob(f'{image_dir}/f*.png')
@@ -228,7 +231,7 @@ def main():
     svm_classifier = svm_ml_technique(train_features, train_labels)
 
     svm_accuracy, svm_report, frr, far = evaluate_performance(
-    svm_classifier, test_features, test_labels)
+        svm_classifier, test_features, test_labels)
 
     print("SVM Accuracy: ", svm_accuracy)
     print("SVM Report:\n", svm_report)
@@ -246,4 +249,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

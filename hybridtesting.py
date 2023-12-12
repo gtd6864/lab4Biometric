@@ -88,7 +88,6 @@ def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_fea
     avg_far = 0
     eer = 1
 
-
     # base final prediction off of a threshold - test a variety of thresholds
     for i in range(1, 99):
         # KNN is most accurate, gets weight of 4. SVM is least accurate, gets weight of 2.
@@ -101,7 +100,7 @@ def evaluate_performance(knn_classifier, svm_classifier, rf_classifier, test_fea
         rf_predictions = [x * 4 for x in rf_predictions]
         predictions = np.add(knn_predictions, svm_predictions)
         predictions = np.add(predictions, rf_predictions)
-        predictions = ((predictions[:]/10) >= i/100).astype(int)
+        predictions = ((predictions[:] / 10) >= i / 100).astype(int)
 
         # Additional Metrics
         sum_frr = 0  # Sum of False Rejects
@@ -277,7 +276,6 @@ def main():
     hybrid_accuracy, hybrid_report, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid = evaluate_performance(
         knn_classifier, svm_classifier, rf_classifier, test_features, test_labels)
 
-
     # Print results
     print("Hybrid Accuracy: ", hybrid_accuracy)
     print("Hybrid Report:\n", hybrid_report)
@@ -286,10 +284,10 @@ def main():
     print(f"Hybrid Equal Error Rate (EER): {eer_hybrid:.4f}")
     print("\n")
 
-
     # Create and display the summary table
     summary_table = [
-        ["hybrid", hybrid_accuracy, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid, avg_far_hybrid, eer_hybrid]
+        ["hybrid", hybrid_accuracy, max_frr_hybrid, min_frr_hybrid, avg_frr_hybrid, max_far_hybrid, min_far_hybrid,
+         avg_far_hybrid, eer_hybrid]
     ]
     headers = ["Method", "Accuracy", "Max FRR", "Min FRR", "Avg FRR", "Max FAR", "Min FAR", "Avg FAR", "EER"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
@@ -297,4 +295,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

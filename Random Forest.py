@@ -54,6 +54,7 @@ def extract_features(minutiae, fixed_size=500):
         features = np.pad(features, (0, fixed_size - len(features)), 'constant')
     return features
 
+
 # Random Forest Classifier
 def rf_ml_technique(train_features, train_labels):
     classifier = RandomForestClassifier(n_estimators=100, max_depth=200, min_samples_split=10, random_state=42)
@@ -95,11 +96,10 @@ def evaluate_performance(classifier, test_features, test_labels):
     frr = sum_frr / true_accepts
     far = sum_far / true_rejects
 
-
     return accuracy, report, frr, far
 
 
-def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False):
+def compare_fingerprints(classifier, path_a, path_b, similarity_threshold=0.28, debug=False):
     # Detect minutiae points
     minutiae_a = find_minutiae(path_a, debug)
     minutiae_b = find_minutiae(path_b, debug)
@@ -107,15 +107,15 @@ def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False)
     # Extract features
     features_a = extract_features(minutiae_a)
     features_b = extract_features(minutiae_b)
-    
+
     combined_features = np.concatenate((features_a, features_b))
     # Calculate similarity
-    similarity = classifier.predict_proba(combined_features)[:, 1] >= .31
+    similarity = (classifier.predict_proba(combined_features)[:, 1] >= similarity_threshold).astype(int)
 
     # Determine if the fingerprints are similar or not
-    return True if similarity == 1 else False
-    
-    
+    return True if similarity[0] == 1 else False
+
+
 def main():
     image_dir = 'NISTSpecialDatabase4GrayScaleImagesofFIGS/sd04/png_txt/full-data'
     reference_image_paths = glob.glob(f'{image_dir}/f*.png')
@@ -228,7 +228,6 @@ def main():
                 # a mismatch pair should be always be a 0
                 test_labels.append(0)
 
-
     max_frr = 0  # Placeholder for maximum False Rejection Rate
     min_frr = 1  # Placeholder for minimum False Rejection Rate
     max_far = 0  # Placeholder for maximum False Acceptance Rate
@@ -239,8 +238,7 @@ def main():
     rf_classifier = rf_ml_technique(train_features, train_labels)
 
     rf_accuracy, rf_report, frr, far = evaluate_performance(
-    rf_classifier, test_features, test_labels)
-
+        rf_classifier, test_features, test_labels)
 
     print("Random Forest Accuracy: ", rf_accuracy)
     print("Random Forest Report:\n", rf_report)
@@ -256,8 +254,5 @@ def main():
     print(tabulate(summary_table, headers, tablefmt="grid"))
 
 
-
-
 if __name__ == '__main__':
     main()
-
