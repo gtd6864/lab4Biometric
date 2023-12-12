@@ -56,7 +56,7 @@ def extract_features(minutiae, fixed_size=500):
 
 # K-Nearest Neighbors Classifier
 def knn_ml_technique(train_features, train_labels):
-    classifier = KNeighborsClassifier(n_neighbors=50)  # Adjust the number of neighbors
+    classifier = KNeighborsClassifier(n_neighbors=100)  # Adjust the number of neighbors
     classifier.fit(train_features, train_labels)
     return classifier
 
@@ -105,9 +105,9 @@ def main():
 
     paired_features = []
     labels = []
-
-    # Load data and extract features for paired images
-    for ref_path in reference_image_paths:
+    # Load data and extract features for the 1500 training images, 1500 matches and 3000 non-matches
+    for i in range(len(reference_image_paths) - 500):
+        ref_path = reference_image_paths[i]
         file_id = os.path.basename(ref_path).split('_')[0][1:]
         subj_path = subject_image_paths.get(file_id)
         if subj_path:
@@ -119,24 +119,96 @@ def main():
             combined_features = np.concatenate((ref_features, subj_features))
 
             paired_features.append(combined_features)
+            # all feature pairs should be a match
+            labels.append(1)
+        # add 2 mismatch pairs for every fingerprint as well
+        if i == 0:
+            dif_path = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 502]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 503]
+        elif i == 1:
+            dif_path = reference_image_paths[0]
+            dif_path_2 = reference_image_paths[len(reference_image_paths) - 501]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 502]
+        elif i == 2:
+            dif_path = reference_image_paths[1]
+            dif_path_2 = reference_image_paths[0]
+            dif_path_3 = reference_image_paths[len(reference_image_paths) - 501]
+        else:
+            dif_path = reference_image_paths[i - 1]
+            dif_path_2 = reference_image_paths[i - 2]
+            dif_path_3 = reference_image_paths[i - 3]
+        file_id = os.path.basename(dif_path).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            label_path = ref_path.replace('.png', '.txt')
-            with open(label_path, 'r') as f:
-                label_text = f.read().strip()
-                label = 0 if "Gender: M" in label_text else 1
-            labels.append(label)
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_2).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-            # Debugging: Print extracted features, label, and image names
-            # print("Extracted Features:", combined_features)
-            # print("Label:", label)
-            # print("Image image pairs: ", os.path.basename(ref_path), os.path.basename(subj_path))
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
+        file_id = os.path.basename(dif_path_3).split('_')[0][1:]
+        subj_path = subject_image_paths.get(file_id)
+        if subj_path:
+            subj_minutiae = find_minutiae(subj_path, disp=False)
+            subj_features = extract_features(subj_minutiae)
+            combined_features = np.concatenate((ref_features, subj_features))
 
-    paired_features = np.array(paired_features)
-    labels = np.array(labels, dtype=int)
+            paired_features.append(combined_features)
+            # all shifted feature pairs should be a non-match
+            labels.append(0)
 
-    # separate the data into first 1500 for training, last 500 for testing
-    train_features, test_features, train_labels, test_labels = train_test_split(paired_features, labels, test_size=0.25,
-                                                                                shuffle=False)
+    train_features = np.array(paired_features)
+    train_labels = np.array(labels, dtype=int)
+
+    # create our test features and labels
+    test_features = []
+    test_labels = []
+
+    # compare each of our 500 test values to either itself or another random test value
+    for i in range(500):
+        ref_path = reference_image_paths[i + 1500]
+        ref_minutiae = find_minutiae(ref_path, disp=False)
+        ref_features = extract_features(ref_minutiae)
+        k = random.randint(0, 1)
+        # just do a normal matching pair
+        if k == 0:
+            file_id = os.path.basename(ref_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # all feature pairs should be a match
+                test_labels.append(1)
+        # otherwise, pair it with a random other value from the test fingerprints
+        else:
+            j = random.randint(1500, 1999)
+            while j == i:
+                j = random.randint(1500, 1999)
+            dif_path = reference_image_paths[j]
+            file_id = os.path.basename(dif_path).split('_')[0][1:]
+            subj_path = subject_image_paths.get(file_id)
+            if subj_path:
+                subj_minutiae = find_minutiae(subj_path, disp=False)
+                subj_features = extract_features(subj_minutiae)
+                combined_features = np.concatenate((ref_features, subj_features))
+                test_features.append(combined_features)
+                # a mismatch pair should be always be a 0
+                test_labels.append(0)
+
     knn_classifier = knn_ml_technique(train_features, train_labels)
 
     knn_accuracy, knn_report, frr, far = evaluate_performance(
@@ -150,13 +222,14 @@ def main():
     print(f"KNN FAR: {far:.4f}")
     print("\n")
 
-
-    # Create and display the summary table
+     # Create and display the summary table
     summary_table = [
         ["KNN", knn_accuracy, frr, far]
     ]
     headers = ["Method", "Accuracy", "FRR", "FAR"]
     print(tabulate(summary_table, headers, tablefmt="grid"))
+
+
 
 if __name__ == '__main__':
     main()
