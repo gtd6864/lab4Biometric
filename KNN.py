@@ -95,6 +95,23 @@ def evaluate_performance(classifier, test_features, test_labels):
     far = sum_far / true_rejects
 
     return accuracy, report, frr, far
+    
+def compare_fingerprints(path_a, path_b, similarity_threshold=0.31, debug=False):
+    # Detect minutiae points
+    minutiae_a = find_minutiae(path_a, debug)
+    minutiae_b = find_minutiae(path_b, debug)
+
+    # Extract features
+    features_a = extract_features(minutiae_a)
+    features_b = extract_features(minutiae_b)
+    
+    combined_features = np.concatenate((features_a, features_b))
+    # Calculate similarity
+    similarity = classifier.predict_proba(combined_features)[:, 1] >= .31
+
+    # Determine if the fingerprints are similar or not
+    return True if similarity == 1 else False
+
 
 
 def main():
